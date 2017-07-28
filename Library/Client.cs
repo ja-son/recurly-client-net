@@ -350,61 +350,69 @@ namespace Recurly
             }
 
             responseStream.Position = 0;
-            using (var xmlReader = new XmlTextReader(responseStream))
+            try
             {
-                // Check for pagination
-                var cursor = string.Empty;
-                string start = null;
-                string next = null;
-                string prev = null;
+                using (var xmlReader = new XmlTextReader(responseStream))
+                {
+                    // Check for pagination
+                    var cursor = string.Empty;
+                    string start = null;
+                    string next = null;
+                    string prev = null;
 
-                var link = response.Headers["Link"];
+                    var link = response.Headers["Link"];
 
-                if (!link.IsNullOrEmpty())
-                {
-                    start = link.GetUrlFromLinkHeader("start");
-                    next = link.GetUrlFromLinkHeader("next");
-                    prev = link.GetUrlFromLinkHeader("prev");
-                    readXmlListDelegate(xmlReader, start, next, prev);
-                } else if (readXmlListDelegate != null)
-                {
-                    readXmlListDelegate(xmlReader, start, next, prev);
+                    if (!link.IsNullOrEmpty())
+                    {
+                        start = link.GetUrlFromLinkHeader("start");
+                        next = link.GetUrlFromLinkHeader("next");
+                        prev = link.GetUrlFromLinkHeader("prev");
+                        readXmlListDelegate(xmlReader, start, next, prev);
+                    }
+                    else if (readXmlListDelegate != null)
+                    {
+                        readXmlListDelegate(xmlReader, start, next, prev);
+                    }
+                    else if (response.StatusCode != HttpStatusCode.NoContent)
+                    {
+                        readXmlDelegate(xmlReader);
+                    }
                 }
-                else if (response.StatusCode != HttpStatusCode.NoContent)
-                {
-                    readXmlDelegate(xmlReader);
-                }
+            }
+            catch (XmlException)
+            {
+                var message = Encoding.UTF8.GetString(responseStream.ToArray());
+                throw new Exception(message);
             }
 
         }
 
         protected virtual void WritePostParameters(Stream outputStream, WriteXmlDelegate writeXmlDelegate)
         {
-            using (var xmlWriter = new XmlTextWriter(outputStream, Encoding.UTF8))
+            try
             {
-                xmlWriter.WriteStartDocument();
-                xmlWriter.Formatting = Formatting.Indented;
-
-                writeXmlDelegate(xmlWriter);
-
-                xmlWriter.WriteEndDocument();
-            }
+                var sb = new StringBuilder();
+                using (var stringWriter = new StringWriterWithEncoding(sb, Encoding.UTF8))
+                using (var xmlWriter = new XmlTextWriter(stringWriter))
+                {
+                    xmlWriter.WriteStartDocument();
+                    xmlWriter.Formatting = Formatting.Indented;
+                    writeXmlDelegate(xmlWriter);
+                    xmlWriter.WriteEndDocument();
+                    var xml = sb.ToString();
+                    byte[] buffer = Encoding.UTF8.GetBytes(xml);
+                    outputStream.Write(buffer, 0, buffer.Length);
 #if (DEBUG)
-            // Also copy XML to debug output
-            Console.WriteLine("Sending Data:");
-            var s = new MemoryStream();
-            using (var xmlWriter = new XmlTextWriter(s, Encoding.UTF8))
-            {
-                xmlWriter.WriteStartDocument();
-                xmlWriter.Formatting = Formatting.Indented;
-
-                writeXmlDelegate(xmlWriter);
-
-                xmlWriter.WriteEndDocument();
-            }
-            Console.WriteLine(Encoding.UTF8.GetString(s.ToArray()));
+                    // Also copy XML to debug output
+                    Console.WriteLine("Sending Data:");
+                    Console.WriteLine(xml);
 #endif
-
+                }
+            }
+            catch (ObjectDisposedException)
+            {
+                // Ignore
+            }
         }
 
         protected virtual MemoryStream CopyAndClose(Stream inputStream)
@@ -424,5 +432,17 @@ namespace Recurly
             return ms;
         }
 
+    }
+
+    class StringWriterWithEncoding : StringWriter
+    {
+        private Encoding encoding;
+        public StringWriterWithEncoding(StringBuilder sb, Encoding encoding)
+            : base(sb)
+        {
+            this.encoding = encoding;
+        }
+
+        public override Encoding Encoding { get { return encoding; }  }
     }
 }

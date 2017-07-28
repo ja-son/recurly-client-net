@@ -55,7 +55,17 @@ namespace Recurly.Configuration
             get { return (int)base["pageSize"]; }
             set { base["pageSize"] = value; }
         }
-      
+
+        /// <summary>
+        /// Default Page Size or limit to the number of results returned at a time
+        /// </summary>
+        [ConfigurationProperty("uriPrefix", IsRequired = false)]
+        public string ServerUriPrefix
+        {
+            get { return (string)base["uriPrefix"]; }
+            set { base["uriPrefix"] = value; }
+        }
+
         #endregion
     }
 }

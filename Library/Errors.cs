@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net;
 using System.Xml;
 
@@ -64,6 +65,11 @@ namespace Recurly
                 catch (XmlException)
                 {
                     // Do nothing
+                }
+                catch (InvalidOperationException)
+                {
+                    Console.WriteLine("Invalid XML response");
+                    errors = new Errors();
                 }
 
                 return errors;
