@@ -41,6 +41,16 @@ namespace Recurly
             _instance = client;
         }
 
+        internal static XmlTextReader BuildXmlTextReader(Stream stream)
+        {
+            var reader = new XmlTextReader(stream);
+            // TODO: ProhibitDtd is for backwards compatibility
+            // but is deprecated. Use DtdProcessing property in next release:
+            // reader.DtdProcessing = DtdProcessing.Prohibit;
+            reader.ProhibitDtd = true;
+            return reader;
+        }
+
         internal void ApplySettings(Settings settings)
         {
             Settings = settings;
@@ -134,6 +144,11 @@ namespace Recurly
             Console.WriteLine("Requesting " + method + " " + url);
 #endif
             var request = (HttpWebRequest)WebRequest.Create(url);
+
+            if (string.IsNullOrWhiteSpace(Settings.Proxy) && !request.RequestUri.Host.EndsWith(Settings.ValidDomain)) {
+                throw new RecurlyException("Domain " + request.RequestUri.Host + " is not a valid Recurly domain");
+            }
+
             request.Accept = "application/xml";      // Tells the server to return XML instead of HTML
             request.ContentType = "application/xml; charset=utf-8"; // The request is an XML document
             request.SendChunked = false;             // Send it all as one request
@@ -350,69 +365,62 @@ namespace Recurly
             }
 
             responseStream.Position = 0;
-            try
+            using (var xmlReader = Client.BuildXmlTextReader(responseStream))
             {
-                using (var xmlReader = new XmlTextReader(responseStream))
+
+                // Check for pagination
+                var cursor = string.Empty;
+                string start = null;
+                string next = null;
+                string prev = null;
+
+                var link = response.Headers["Link"];
+
+                if (!link.IsNullOrEmpty())
                 {
-                    // Check for pagination
-                    var cursor = string.Empty;
-                    string start = null;
-                    string next = null;
-                    string prev = null;
-
-                    var link = response.Headers["Link"];
-
-                    if (!link.IsNullOrEmpty())
-                    {
-                        start = link.GetUrlFromLinkHeader("start");
-                        next = link.GetUrlFromLinkHeader("next");
-                        prev = link.GetUrlFromLinkHeader("prev");
-                        readXmlListDelegate(xmlReader, start, next, prev);
-                    }
-                    else if (readXmlListDelegate != null)
-                    {
-                        readXmlListDelegate(xmlReader, start, next, prev);
-                    }
-                    else if (response.StatusCode != HttpStatusCode.NoContent)
-                    {
-                        readXmlDelegate(xmlReader);
-                    }
+                    start = link.GetUrlFromLinkHeader("start");
+                    next = link.GetUrlFromLinkHeader("next");
+                    prev = link.GetUrlFromLinkHeader("prev");
+                    readXmlListDelegate(xmlReader, start, next, prev);
+                } else if (readXmlListDelegate != null)
+                {
+                    readXmlListDelegate(xmlReader, start, next, prev);
                 }
-            }
-            catch (XmlException)
-            {
-                var message = Encoding.UTF8.GetString(responseStream.ToArray());
-                throw new Exception(message);
+                else if (response.StatusCode != HttpStatusCode.NoContent)
+                {
+                    readXmlDelegate(xmlReader);
+                }
             }
 
         }
 
         protected virtual void WritePostParameters(Stream outputStream, WriteXmlDelegate writeXmlDelegate)
         {
-            try
+            using (var xmlWriter = new XmlTextWriter(outputStream, Encoding.UTF8))
             {
-                var sb = new StringBuilder();
-                using (var stringWriter = new StringWriterWithEncoding(sb, Encoding.UTF8))
-                using (var xmlWriter = new XmlTextWriter(stringWriter))
-                {
-                    xmlWriter.WriteStartDocument();
-                    xmlWriter.Formatting = Formatting.Indented;
-                    writeXmlDelegate(xmlWriter);
-                    xmlWriter.WriteEndDocument();
-                    var xml = sb.ToString();
-                    byte[] buffer = Encoding.UTF8.GetBytes(xml);
-                    outputStream.Write(buffer, 0, buffer.Length);
+                xmlWriter.WriteStartDocument();
+                xmlWriter.Formatting = Formatting.Indented;
+
+                writeXmlDelegate(xmlWriter);
+
+                xmlWriter.WriteEndDocument();
+            }
 #if (DEBUG)
-                    // Also copy XML to debug output
-                    Console.WriteLine("Sending Data:");
-                    Console.WriteLine(xml);
-#endif
-                }
-            }
-            catch (ObjectDisposedException)
+            // Also copy XML to debug output
+            Console.WriteLine("Sending Data:");
+            var s = new MemoryStream();
+            using (var xmlWriter = new XmlTextWriter(s, Encoding.UTF8))
             {
-                // Ignore
+                xmlWriter.WriteStartDocument();
+                xmlWriter.Formatting = Formatting.Indented;
+
+                writeXmlDelegate(xmlWriter);
+
+                xmlWriter.WriteEndDocument();
             }
+            Console.WriteLine(Encoding.UTF8.GetString(s.ToArray()));
+#endif
+
         }
 
         protected virtual MemoryStream CopyAndClose(Stream inputStream)
@@ -432,17 +440,5 @@ namespace Recurly
             return ms;
         }
 
-    }
-
-    class StringWriterWithEncoding : StringWriter
-    {
-        private Encoding encoding;
-        public StringWriterWithEncoding(StringBuilder sb, Encoding encoding)
-            : base(sb)
-        {
-            this.encoding = encoding;
-        }
-
-        public override Encoding Encoding { get { return encoding; }  }
     }
 }

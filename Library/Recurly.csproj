@@ -32,6 +32,8 @@
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
     <TargetFrameworkProfile />
+    <NuGetPackageImportStamp>
+    </NuGetPackageImportStamp>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -62,12 +64,20 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AccountAcquisition.cs" />
+    <Compile Include="CreditPayment.cs" />
+    <Compile Include="Delivery.cs" />
+    <Compile Include="GiftCard.cs" />
     <Compile Include="Account.cs" />
     <Compile Include="AccountBalance.cs" />
     <Compile Include="Address.cs" />
     <Compile Include="FilterCriteria.cs" />
+    <Compile Include="InvoiceCollection.cs" />
+    <Compile Include="List\CreditPaymentList.cs" />
+    <Compile Include="Purchase.cs" />
     <Compile Include="Errors.cs" />
     <Compile Include="Export.cs" />
+    <Compile Include="List\GiftCardList.cs" />
     <Compile Include="List\ExportDateList.cs" />
     <Compile Include="List\ExportFileList.cs" />
     <Compile Include="TransactionError.cs" />
@@ -140,6 +150,9 @@
       <ProductName>Windows Installer 3.1</ProductName>
       <Install>true</Install>
     </BootstrapperPackage>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

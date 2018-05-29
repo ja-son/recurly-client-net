@@ -15,7 +15,7 @@ namespace Recurly
         public string PlanCode { get; set; }
         public string AddOnCode { get; set; }
         public string Name { get; set; }
-        public int DefaultQuantity { get; set; }
+        public int? DefaultQuantity { get; set; }
         public bool? DisplayQuantityOnHostedPage { get; set; }
         public string TaxCode { get; set; }
         public bool? Optional { get; set; }
@@ -25,6 +25,7 @@ namespace Recurly
         public Usage.Type? UsageType { get; set; }
         public DateTime CreatedAt { get; private set; }
         public DateTime UpdatedAt { get; private set; }
+        public Adjustment.RevenueSchedule? RevenueScheduleType { get; set; }
 
         private Dictionary<string, int> _unitAmountInCents;
         /// <summary>
@@ -63,7 +64,7 @@ namespace Recurly
         public void Create()
         {
             Client.Instance.PerformRequest(Client.HttpRequestMethod.Post,
-                UrlPrefix + Uri.EscapeUriString(PlanCode) + UrlPostfix,
+                UrlPrefix + Uri.EscapeDataString(PlanCode) + UrlPostfix,
                 WriteXml,
                 ReadXml);
         }
@@ -74,7 +75,7 @@ namespace Recurly
         public void Update()
         {
             Client.Instance.PerformRequest(Client.HttpRequestMethod.Put,
-                UrlPrefix + Uri.EscapeUriString(PlanCode) + UrlPostfix + Uri.EscapeUriString(AddOnCode),
+                UrlPrefix + Uri.EscapeDataString(PlanCode) + UrlPostfix + Uri.EscapeDataString(AddOnCode),
                 WriteXml,
                 ReadXml);
         }
@@ -85,7 +86,7 @@ namespace Recurly
         public void Delete()
         {
             Client.Instance.PerformRequest(Client.HttpRequestMethod.Delete,
-                UrlPrefix + Uri.EscapeUriString(PlanCode) + UrlPostfix + Uri.EscapeUriString(AddOnCode));
+                UrlPrefix + Uri.EscapeDataString(PlanCode) + UrlPostfix + Uri.EscapeDataString(AddOnCode));
         }
 
 
@@ -165,6 +166,12 @@ namespace Recurly
                     case "usage_type":
                         UsageType = reader.ReadElementContentAsString().ParseAsEnum<Usage.Type>();
                         break;
+
+                    case "revenue_schedule_type":
+                        var revenueScheduleType = reader.ReadElementContentAsString();
+                        if (!revenueScheduleType.IsNullOrEmpty())
+                            RevenueScheduleType = revenueScheduleType.ParseAsEnum<Adjustment.RevenueSchedule>();
+                        break;
                 }
             }
         }
@@ -175,8 +182,10 @@ namespace Recurly
 
             xmlWriter.WriteElementString("add_on_code", AddOnCode);
             xmlWriter.WriteElementString("name", Name);
-            xmlWriter.WriteElementString("default_quantity", DefaultQuantity.AsString());
             xmlWriter.WriteElementString("accounting_code", AccountingCode);
+
+            if (DefaultQuantity.HasValue)
+                xmlWriter.WriteElementString("default_quantity", DefaultQuantity.Value.AsString());
 
             if (AddOnType.HasValue)
                 xmlWriter.WriteElementString("add_on_type", AddOnType.Value.ToString().EnumNameToTransportCase());
@@ -195,6 +204,9 @@ namespace Recurly
 
             xmlWriter.WriteIfCollectionHasAny("unit_amount_in_cents", UnitAmountInCents, pair => pair.Key,
                 pair => pair.Value.AsString());
+
+            if (RevenueScheduleType.HasValue)
+                xmlWriter.WriteElementString("revenue_schedule_type", RevenueScheduleType.Value.ToString().EnumNameToTransportCase());
 
             xmlWriter.WriteEndElement();
         }

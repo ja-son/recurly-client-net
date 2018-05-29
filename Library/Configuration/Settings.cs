@@ -16,7 +16,7 @@ namespace Recurly.Configuration
             {
                 if (_hasLoaded == false)
                 {
-                    throw new Exception("The Recurly client has has no configuration initialized, please add your settings to web/app.config or call Recurly.Configuration.SettingsManager.Initialize(args)");
+                    throw new Exception("The Recurly client has no configuration initialized, please add your settings to web/app.config or call Recurly.Configuration.SettingsManager.Initialize(args)");
                 }
                 return _apiKey;
             }
@@ -29,7 +29,7 @@ namespace Recurly.Configuration
             {
                 if (_hasLoaded == false)
                 {
-                    throw new Exception("The Recurly client has has no configuration initialized, please add your settings to web/app.config or call Recurly.Configuration.SettingsManager.Initialize(args)");
+                    throw new Exception("The Recurly client has no configuration initialized, please add your settings to web/app.config or call Recurly.Configuration.SettingsManager.Initialize(args)");
                 }
                 return _privateKey;
             }
@@ -42,7 +42,7 @@ namespace Recurly.Configuration
             {
                 if (_hasLoaded == false)
                 {
-                    throw new Exception("The Recurly client has has no configuration initialized, please add your settings to web/app.config or call Recurly.Configuration.SettingsManager.Initialize(args)");
+                    throw new Exception("The Recurly client has no configuration initialized, please add your settings to web/app.config or call Recurly.Configuration.SettingsManager.Initialize(args)");
                 }
                 return _subdomain;
             }
@@ -55,28 +55,30 @@ namespace Recurly.Configuration
             {
                 if (_hasLoaded == false)
                 {
-                    throw new Exception("The Recurly client has has no configuration initialized, please add your settings to web/app.config or call Recurly.Configuration.SettingsManager.Initialize(args)");
+                    throw new Exception("The Recurly client has no configuration initialized, please add your settings to web/app.config or call Recurly.Configuration.SettingsManager.Initialize(args)");
                 }
                 return _pageSize;
             }
             private set { _pageSize = value; }
         }
 
-        public string ServerUriPrefix
+        public string Proxy
         {
             get
             {
-                if (_hasLoaded == false)
+                if(_hasLoaded == false)
                 {
-                    throw new Exception("The Recurly client has has no configuration initialized, please add your settings to web/app.config or call Recurly.Configuration.SettingsManager.Initialize(args)");
+                    throw new Exception("The Recurly client has no configuration initialized, please add your settings to web/app.config or call Recurly.Configuration.SettingsManager.Initialize(args)");
                 }
-                return _serverUriPrefix;
+
+                return _proxy;
             }
-            private set { _serverUriPrefix = value; }
+            private set { _proxy = value; }
         }
 
         protected const string RecurlyServerUri = "https://{0}.recurly.com/v2{1}";
-        public const string RecurlyApiVersion = "2.6";
+        public const string RecurlyApiVersion = "2.12";
+        public const string ValidDomain = ".recurly.com";
 
         // static, unlikely to change
         public string UserAgent
@@ -102,14 +104,12 @@ namespace Recurly.Configuration
             if (givenPath.Contains("://"))
                 return givenPath;
 
-            var prefix = Subdomain;
-
-            if(!string.IsNullOrWhiteSpace(ServerUriPrefix))
+            if(!string.IsNullOrWhiteSpace(Proxy))
             {
-                prefix = string.Format("{0}{1}", ServerUriPrefix, Subdomain);
+                return string.Format("{0}/v2{1}", Proxy, givenPath);
             }
 
-            return string.Format(RecurlyServerUri, prefix, givenPath);
+            return string.Format(RecurlyServerUri, Subdomain, givenPath);
         }
 
         private static Settings _instance;
@@ -118,7 +118,7 @@ namespace Recurly.Configuration
         private int _pageSize;
         private bool _hasLoaded;
         private string _subdomain;
-        private string _serverUriPrefix;
+        private string _proxy;
 
         public static Settings Instance
         {
@@ -132,16 +132,17 @@ namespace Recurly.Configuration
             Subdomain = Section.Current.Subdomain;
             PrivateKey = Section.Current.PrivateKey;
             PageSize = Section.Current.PageSize;
-            ServerUriPrefix = Section.Current.ServerUriPrefix;
+            Proxy = Section.Current.Proxy;
             _hasLoaded = true;
         }
 
-        public void Initialize(string apiKey, string subdomain, string privateKey = "", int pageSize = 50, string serverUriPrex = "")
+        public void Initialize(string apiKey, string subdomain, string privateKey = "", int pageSize = 50, string proxy = "")
         {
             ApiKey = apiKey;
             Subdomain = subdomain;
             PrivateKey = privateKey;
             PageSize = pageSize;
+            Proxy = proxy;
             _hasLoaded = true;
         }
 

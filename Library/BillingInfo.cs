@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Net;
@@ -20,7 +20,13 @@ namespace Recurly
             Maestro,
             Forbrugsforeningen,
             Laser,
-            Unknown
+            Unknown,
+            DinersClub
+        }
+
+        public enum HppType : short
+        {
+            Adyen
         }
 
         public enum BankAccountType : short
@@ -132,6 +138,12 @@ namespace Recurly
         /// </summary>
         public DateTime UpdatedAt { get; set; }
 
+        /// <summary>
+        /// Can be used if the payments are to be collected by external
+        /// HPP (e.g. Adyen Hosted Payments).
+        /// </summary>
+        public HppType? ExternalHppType { get; set; }
+
         private const string UrlPrefix = "/accounts/";
         private const string UrlPostfix = "/billing_info";
 
@@ -186,7 +198,7 @@ namespace Recurly
 
         private static string BillingInfoUrl(string accountCode)
         {
-            return UrlPrefix + Uri.EscapeUriString(accountCode) + UrlPostfix;
+            return UrlPrefix + Uri.EscapeDataString(accountCode) + UrlPostfix;
         }
 
         internal override void ReadXml(XmlTextReader reader)
@@ -201,6 +213,10 @@ namespace Recurly
 
                 switch (reader.Name)
                 {
+                    case "billing_info":
+                        // The element's opening tag - nothing to do
+                        break;
+
                     case "account":
                         var href = reader.GetAttribute("href");
                         AccountCode = Uri.UnescapeDataString(href.Substring(href.LastIndexOf("/") + 1));
@@ -297,12 +313,21 @@ namespace Recurly
                     case "account_type":
                         AccountType = reader.ReadElementContentAsString().ParseAsEnum<BankAccountType>();
                         break;
+
+                    case "external_hpp_type":
+                        ExternalHppType = reader.ReadElementContentAsString().ParseAsEnum<HppType>();
+                        break;
+
                     case "updated_at":
                         DateTime d;
                         if (DateTime.TryParse(reader.ReadElementContentAsString(), out d))
                         {
                             UpdatedAt = d;
                         }
+                        break;
+
+                    default:
+                        Debug.WriteLine("Recurly Client Library: Unexpected XML field in response - " + reader.Name);
                         break;
                 }
             }
@@ -317,6 +342,7 @@ namespace Recurly
             {
                 xmlWriter.WriteStringIfValid("first_name", FirstName);
                 xmlWriter.WriteStringIfValid("last_name", LastName);
+                xmlWriter.WriteStringIfValid("company", Company);
                 xmlWriter.WriteStringIfValid("name_on_account", NameOnAccount);
                 xmlWriter.WriteStringIfValid("address1", Address1);
                 xmlWriter.WriteStringIfValid("address2", Address2);
@@ -357,6 +383,12 @@ namespace Recurly
                 if (!AmazonBillingAgreementId.IsNullOrEmpty())
                 {
                     xmlWriter.WriteElementString("amazon_billing_agreement_id", AmazonBillingAgreementId);
+                }
+
+                if (ExternalHppType.HasValue)
+                {
+                    xmlWriter.WriteElementString("external_hpp_type", ExternalHppType.Value.ToString().EnumNameToTransportCase());
+
                 }
             }
 

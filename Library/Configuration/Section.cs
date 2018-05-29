@@ -57,15 +57,14 @@ namespace Recurly.Configuration
         }
 
         /// <summary>
-        /// Default Page Size or limit to the number of results returned at a time
+        /// The proxy URI to use instead of the recurly subdomain and server URI.
         /// </summary>
-        [ConfigurationProperty("uriPrefix", IsRequired = false)]
-        public string ServerUriPrefix
+        [ConfigurationProperty("proxy", IsRequired = false)]
+        public string Proxy
         {
-            get { return (string)base["uriPrefix"]; }
-            set { base["uriPrefix"] = value; }
+            get { return (string)base["proxy"]; }
+            set { base["proxy"] = value; }
         }
-
         #endregion
     }
 }

@@ -27,10 +27,10 @@ namespace Recurly
         public string UnitName { get; set; }
         public string PaymentPageTOSLink { get; set; }
 
-        public int PlanIntervalLength { get; set; }
+        public int? PlanIntervalLength { get; set; }
         public IntervalUnit PlanIntervalUnit { get; set; }
 
-        public int TrialIntervalLength { get; set; }
+        public int? TrialIntervalLength { get; set; }
         public IntervalUnit TrialIntervalUnit { get; set; }
 
         public string AccountingCode { get; set; }
@@ -45,7 +45,10 @@ namespace Recurly
 
         public string TaxCode { get; set; }
 
-        public bool TrialRequiresBillingInfo { get; set; }
+        public bool? TrialRequiresBillingInfo { get; set; }
+
+        public Adjustment.RevenueSchedule? RevenueScheduleType { get; set; }
+        public Adjustment.RevenueSchedule? SetupFeeRevenueScheduleType { get; set; }
 
         private AddOnList _addOns;
 
@@ -55,7 +58,7 @@ namespace Recurly
             {
                 if (_addOns == null)
                 {
-                    var url = UrlPrefix + Uri.EscapeUriString(PlanCode) + "/add_ons/";
+                    var url = UrlPrefix + Uri.EscapeDataString(PlanCode) + "/add_ons/";
                     _addOns = new AddOnList(url);
                 }
                 return _addOns;
@@ -117,7 +120,7 @@ namespace Recurly
         public void Update()
         {
             Client.Instance.PerformRequest(Client.HttpRequestMethod.Put,
-                UrlPrefix + Uri.EscapeUriString(PlanCode),
+                UrlPrefix + Uri.EscapeDataString(PlanCode),
                 WriteXml);
         }
 
@@ -126,7 +129,7 @@ namespace Recurly
         /// </summary>
         public void Deactivate()
         {
-            Client.Instance.PerformRequest(Client.HttpRequestMethod.Delete, UrlPrefix + Uri.EscapeUriString(PlanCode));
+            Client.Instance.PerformRequest(Client.HttpRequestMethod.Delete, UrlPrefix + Uri.EscapeDataString(PlanCode));
         }
 
         /// <summary>
@@ -146,7 +149,7 @@ namespace Recurly
             var addOn = new AddOn();
 
             var status = Client.Instance.PerformRequest(Client.HttpRequestMethod.Get,
-                UrlPrefix + Uri.EscapeUriString(PlanCode) + "/add_ons/" + Uri.EscapeUriString(addOnCode),
+                UrlPrefix + Uri.EscapeDataString(PlanCode) + "/add_ons/" + Uri.EscapeDataString(addOnCode),
                 addOn.ReadXml);
 
             if (status != HttpStatusCode.OK) return null;
@@ -309,6 +312,18 @@ namespace Recurly
                         if (bool.TryParse(reader.ReadElementContentAsString(), out b))
                             TrialRequiresBillingInfo = b;
                         break;
+
+                    case "revenue_schedule_type":
+                        var revenueScheduleType = reader.ReadElementContentAsString();
+                        if (!revenueScheduleType.IsNullOrEmpty())
+                            RevenueScheduleType = revenueScheduleType.ParseAsEnum<Adjustment.RevenueSchedule>();
+                        break;
+
+                    case "setup_fee_revenue_schedule_type":
+                        var setupFeeRevenueScheduleType = reader.ReadElementContentAsString();
+                        if (!setupFeeRevenueScheduleType.IsNullOrEmpty())
+                            SetupFeeRevenueScheduleType = setupFeeRevenueScheduleType.ParseAsEnum<Adjustment.RevenueSchedule>();
+                        break;
                 }
             }
         }
@@ -322,15 +337,15 @@ namespace Recurly
             xmlWriter.WriteStringIfValid("description", Description);
             xmlWriter.WriteStringIfValid("accounting_code", AccountingCode);
             xmlWriter.WriteStringIfValid("setup_fee_accounting_code", SetupFeeAccountingCode);
-            if (PlanIntervalLength > 0)
+            if (PlanIntervalLength.HasValue)
             {
                 xmlWriter.WriteElementString("plan_interval_unit", PlanIntervalUnit.ToString().EnumNameToTransportCase());
-                xmlWriter.WriteElementString("plan_interval_length", PlanIntervalLength.AsString());
+                xmlWriter.WriteElementString("plan_interval_length", PlanIntervalLength.Value.AsString());
             }
-            if (TrialIntervalLength > 0)
+            if (TrialIntervalLength.HasValue)
             {
                 xmlWriter.WriteElementString("trial_interval_unit", TrialIntervalUnit.ToString().EnumNameToTransportCase());
-                xmlWriter.WriteElementString("trial_interval_length", TrialIntervalLength.AsString());
+                xmlWriter.WriteElementString("trial_interval_length", TrialIntervalLength.Value.AsString());
             }
 
             xmlWriter.WriteIfCollectionHasAny("setup_fee_in_cents", SetupFeeInCents, pair => pair.Key, pair => pair.Value.AsString());
@@ -357,10 +372,17 @@ namespace Recurly
             if (TaxExempt.HasValue)
                 xmlWriter.WriteElementString("tax_exempt", TaxExempt.Value.AsString());
 
-            xmlWriter.WriteElementString("trial_requires_billing_info", TrialRequiresBillingInfo.AsString());
+            if (TrialRequiresBillingInfo.HasValue)
+                xmlWriter.WriteElementString("trial_requires_billing_info", TrialRequiresBillingInfo.Value.AsString());
 
             xmlWriter.WriteStringIfValid("success_url", SuccessUrl);
             xmlWriter.WriteStringIfValid("cancel_url", CancelUrl);
+
+            if (RevenueScheduleType.HasValue)
+                xmlWriter.WriteElementString("revenue_schedule_type", RevenueScheduleType.Value.ToString().EnumNameToTransportCase());
+
+            if (SetupFeeRevenueScheduleType.HasValue)
+                xmlWriter.WriteElementString("setup_fee_revenue_schedule_type", SetupFeeRevenueScheduleType.Value.ToString().EnumNameToTransportCase());
 
             xmlWriter.WriteEndElement();
         }
@@ -427,7 +449,7 @@ namespace Recurly
             var plan = new Plan();
 
             var statusCode = Client.Instance.PerformRequest(Client.HttpRequestMethod.Get,
-                Plan.UrlPrefix + Uri.EscapeUriString(planCode),
+                Plan.UrlPrefix + Uri.EscapeDataString(planCode),
                 plan.ReadXml);
 
             return statusCode == HttpStatusCode.NotFound ? null : plan;
