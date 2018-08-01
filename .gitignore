@@ -187,3 +187,5 @@ Desktop.ini
 $RECYCLE.BIN/
 
 .DS_Store
+/.vs/Recurly
+/packages/more.xunit.runner.visualstudio.2.2.2

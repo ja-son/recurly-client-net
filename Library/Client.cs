@@ -158,11 +158,18 @@ namespace Recurly
             request.Method = method.ToString().ToUpper();
 
             Debug.WriteLine(String.Format("Recurly: Requesting {0} {1}", request.Method, request.RequestUri));
+            Trace.WriteLine(String.Format("Recurly: Requesting {0} {1}", request.Method, request.RequestUri));
 
             if ((method == HttpRequestMethod.Post || method == HttpRequestMethod.Put) && (writeXmlDelegate != null))
             {
                 // 60 second timeout -- some payment gateways (e.g. PayPal) can take a while to respond
                 request.Timeout = 60000;
+
+                foreach (var header in request.Headers)
+                {
+                    Debug.WriteLine(header + ": " + request.Headers[header.ToString()]);
+                    Trace.WriteLine(header + ": " + request.Headers[header.ToString()]);
+                }
 
                 // Write POST/PUT body
                 using (var requestStream = request.GetRequestStream())
@@ -342,10 +349,13 @@ namespace Recurly
 #if (DEBUG)
             Debug.WriteLine("Got Response:");
             Debug.WriteLine("Status code: " + response.StatusCode);
+            Trace.WriteLine("Got Response:");
+            Trace.WriteLine("Status code: " + response.StatusCode);
 
             foreach (var header in response.Headers)
             {
                 Debug.WriteLine(header + ": " + response.Headers[header.ToString()]);
+                Trace.WriteLine(header + ": " + response.Headers[header.ToString()]);
             }
 #endif
             var responseStream = CopyAndClose(response.GetResponseStream());
@@ -356,6 +366,7 @@ namespace Recurly
             while ((line = reader.ReadLine()) != null)
             {
                 Debug.WriteLine(line);
+                Trace.WriteLine(line);
             }
 #endif
             if (responseDelegate != null)
@@ -396,30 +407,30 @@ namespace Recurly
 
         protected virtual void WritePostParameters(Stream outputStream, WriteXmlDelegate writeXmlDelegate)
         {
-            using (var xmlWriter = new XmlTextWriter(outputStream, Encoding.UTF8))
+            try
             {
-                xmlWriter.WriteStartDocument();
-                xmlWriter.Formatting = Formatting.Indented;
-
-                writeXmlDelegate(xmlWriter);
-
-                xmlWriter.WriteEndDocument();
-            }
+                var sb = new StringBuilder();
+                using (var stringWriter = new StringWriterWithEncoding(sb, Encoding.UTF8))
+                using (var xmlWriter = new XmlTextWriter(stringWriter))
+                {
+                    xmlWriter.WriteStartDocument();
+                    xmlWriter.Formatting = Formatting.Indented;
+                    writeXmlDelegate(xmlWriter);
+                    xmlWriter.WriteEndDocument();
+                    var xml = sb.ToString();
+                    byte[] buffer = Encoding.UTF8.GetBytes(xml);
+                    outputStream.Write(buffer, 0, buffer.Length);
 #if (DEBUG)
-            // Also copy XML to debug output
-            Console.WriteLine("Sending Data:");
-            var s = new MemoryStream();
-            using (var xmlWriter = new XmlTextWriter(s, Encoding.UTF8))
-            {
-                xmlWriter.WriteStartDocument();
-                xmlWriter.Formatting = Formatting.Indented;
-
-                writeXmlDelegate(xmlWriter);
-
-                xmlWriter.WriteEndDocument();
-            }
-            Console.WriteLine(Encoding.UTF8.GetString(s.ToArray()));
+                    // Also copy XML to debug output
+                    Console.WriteLine("Sending Data:");
+                    Console.WriteLine(xml);
 #endif
+                }
+            }
+            catch (ObjectDisposedException)
+            {
+                // Ignore
+            }
 
         }
 
@@ -440,5 +451,17 @@ namespace Recurly
             return ms;
         }
 
+    }
+
+    class StringWriterWithEncoding : StringWriter
+    {
+        private Encoding encoding;
+        public StringWriterWithEncoding(StringBuilder sb, Encoding encoding)
+            : base(sb)
+        {
+            this.encoding = encoding;
+        }
+
+        public override Encoding Encoding { get { return encoding; } }
     }
 }
